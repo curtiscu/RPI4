@@ -5,12 +5,19 @@ received packets.
 """
 import argparse
 import math
+
 import datetime
+import atexit
+import signal
+import pprint
 
 
 
 from pythonosc import dispatcher
 from pythonosc import osc_server
+
+
+
 
 def print_volume_handler(unused_addr, args, volume):
   print("[{0}] ~ {1}".format(args[0], volume))
@@ -21,9 +28,30 @@ def print_compute_handler(unused_addr, args, volume):
   except ValueError: pass
 
 
-def log_message(address, message):
-    print("{} - Address: {}, Message: {}".format(datetime.datetime.now() ,address, message))
+all_logs = {}
 
+def log_message(address, message):
+    my_time = datetime.datetime.now()
+    my_log = "{} - Address: {}, Message: {}".format(my_time ,address, message)
+    #print(my_log)
+    
+    log_queue = all_logs.get(address)
+    if log_queue is None:
+        new_log = []
+        new_log.append(my_log)
+        all_logs[address] = new_log
+    else:
+        log_queue.append(my_log)
+        
+    pprint.pprint(all_logs)
+      
+@atexit.register
+def print_data_info():
+    print("Program terminated!")
+
+#atexit.register(print_data_info)
+signal.signal(signal.SIGTERM, print_data_info)
+signal.signal(signal.SIGINT, print_data_info)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
@@ -46,5 +74,7 @@ if __name__ == "__main__":
 
   server = osc_server.ThreadingOSCUDPServer(
       (args.ip, args.port), dispatcher)
+  #server = osc_server.BlockingOSCUDPServer(
+  #    (args.ip, args.port), dispatcher)
   print("Serving on {}".format(server.server_address))
   server.serve_forever()
